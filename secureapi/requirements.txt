@@ -4,3 +4,5 @@ requests
 beautifulsoup4
 cryptography
 bcrypt
+python-jose[cryptography]
+python-dotenv
