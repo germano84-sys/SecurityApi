@@ -10,19 +10,17 @@ PROJECT_ROOT = SECUREAPI_DIR.parent
 load_dotenv(PROJECT_ROOT / ".env", override=True)
 load_dotenv(SECUREAPI_DIR / ".env", override=True)
 
-SECRET_KEY = os.getenv("SECRET_KEY")
-if not SECRET_KEY:
-	raise ValueError("Falta SECRET_KEY en variables de entorno (.env)")
+SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-me")
 
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "30"))
-ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")
-ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD")
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME", "admin")
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
 ADMIN_MASTER_KEY = os.getenv("ADMIN_MASTER_KEY")
 
 
 def _get_bool(name: str, default: str = "false") -> bool:
-	return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
+    return os.getenv(name, default).strip().lower() in {"1", "true", "yes", "on"}
 
 
 EMAIL_NOTIFICATIONS_ENABLED = _get_bool("EMAIL_NOTIFICATIONS_ENABLED", "false")

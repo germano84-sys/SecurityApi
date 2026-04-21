@@ -8,6 +8,7 @@ __pycache__/
 # Sensitive env files
 .env
 secureapi/.env
+secureapi/keys/*.json
 
 # Local databases
 secureapi/scans.db

@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from fastapi import APIRouter, Request
+from fastapi.responses import FileResponse
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
@@ -14,6 +15,17 @@ router = APIRouter(tags=["web"])
 def index(request: Request):
     return templates.TemplateResponse(
         request=request,
+        name="index.html",
+        context={
+            "title": "SecurityApi",
+        },
+    )
+
+
+@router.get("/dashboard", response_class=HTMLResponse, include_in_schema=False)
+def dashboard(request: Request):
+    return templates.TemplateResponse(
+        request=request,
         name="dashboard.html",
         context={
             "title": "SecurityApi Dashboard",
@@ -21,3 +33,8 @@ def index(request: Request):
             "role_options": ["admin", "supervisor", "usuario_comun"],
         },
     )
+
+
+@router.get("/firebase-messaging-sw.js", include_in_schema=False)
+def firebase_service_worker():
+    return FileResponse(BASE_DIR / "static" / "firebase-messaging-sw.js")

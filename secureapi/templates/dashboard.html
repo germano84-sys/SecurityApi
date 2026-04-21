@@ -103,6 +103,9 @@
     <section class="panel hidden" id="scanPanel">
       <h2>4) Escaner y Historial</h2>
       <div class="row">
+        <span class="hint" id="browserPushState">notificaciones en espera</span>
+      </div>
+      <div class="row">
         <input id="scanUrl" placeholder="https://example.com">
         <button id="scanSiteBtn" onclick="scanSite()">Escanear</button>
         <button id="scanHistoryBtn" onclick="scanHistory()">Ver Historial</button>
@@ -118,6 +121,17 @@
   <script>
     let token = "";
     let currentUser = null;
+    let firebaseMessagingClient = null;
+
+    const firebaseWebConfig = {
+      apiKey: "AIzaSyDUx8iLmsDzNd8CHyPvViaTWCs5-RELx0w",
+      authDomain: "securityapi-b6b9d.firebaseapp.com",
+      projectId: "securityapi-b6b9d",
+      storageBucket: "securityapi-b6b9d.firebasestorage.app",
+      messagingSenderId: "57499153855",
+      appId: "1:57499153855:web:50a52344649dbd37f05d0a",
+    };
+    const firebaseVapidKey = "BMuIY4RFBhzCbyJyaV0jit7M70KJgV0CuWSglrR7F4ipaa0dMeSHW-sn88ZPAYRe-VV_wpSvxyBtjLF1YwPQALs";
 
     function setVisible(elementId, visible) {
       const element = document.getElementById(elementId);
@@ -236,6 +250,10 @@
       }
       document.getElementById("tokenState").textContent = token ? "activo" : "sin token";
       refreshUiByRole();
+
+      if (token && currentUser) {
+        autoConfigureBrowserPush();
+      }
     }
 
     function headers() {
@@ -277,6 +295,70 @@
       document.getElementById("scanUrl").value = "";
     }
 
+    function updatePushState(message) {
+      const state = document.getElementById("browserPushState");
+      if (!state) {
+        return;
+      }
+      state.textContent = message;
+    }
+
+    async function autoConfigureBrowserPush() {
+      if (!can("scanAndViewHistory")) {
+        updatePushState("notificaciones no aplican para este rol");
+        return;
+      }
+
+      if (!("Notification" in window) || !("serviceWorker" in navigator)) {
+        updatePushState("navegador sin soporte para push");
+        return;
+      }
+
+      try {
+        if (Notification.permission === "denied") {
+          updatePushState("notificaciones bloqueadas en navegador");
+          return;
+        }
+
+        const swReg = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+        const client = await getFirebaseMessagingClient();
+
+        let permission = Notification.permission;
+        if (permission === "default") {
+          permission = await Notification.requestPermission();
+        }
+
+        if (permission !== "granted") {
+          updatePushState("permiso de notificaciones no concedido");
+          return;
+        }
+
+        const fcmToken = await client.getTokenFn(client.messaging, {
+          vapidKey: firebaseVapidKey,
+          serviceWorkerRegistration: swReg,
+        });
+
+        if (!fcmToken) {
+          updatePushState("no se pudo generar token fcm");
+          return;
+        }
+
+        const storedToken = localStorage.getItem("dashboard_fcm_token");
+        if (storedToken === fcmToken) {
+          updatePushState("notificaciones activas en este navegador");
+          return;
+        }
+
+        const response = await api("POST", "/auth/fcm-token", { token: fcmToken });
+        localStorage.setItem("dashboard_fcm_token", fcmToken);
+        updatePushState("notificaciones activas en este navegador");
+        show(response);
+      } catch (error) {
+        updatePushState("error al configurar notificaciones");
+        show(error);
+      }
+    }
+
     function clearLoginForm() {
       document.getElementById("username").value = "";
       document.getElementById("password").value = "";
@@ -294,6 +376,35 @@
       document.getElementById("roleNotice").classList.add("hidden");
       document.getElementById("output").textContent = "Esperando acciones...";
       document.getElementById("taskAssigneeOptions").innerHTML = "";
+      updatePushState("notificaciones no configuradas");
+    }
+
+    async function getFirebaseMessagingClient() {
+      if (firebaseMessagingClient) {
+        return firebaseMessagingClient;
+      }
+
+      const firebaseAppModule = await import("https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js");
+      const firebaseMessagingModule = await import("https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging.js");
+
+      const app = firebaseAppModule.initializeApp(firebaseWebConfig);
+      const messaging = firebaseMessagingModule.getMessaging(app);
+
+      firebaseMessagingModule.onMessage(messaging, (payload) => {
+        const notification = payload?.notification || {};
+        if (Notification.permission === "granted") {
+          new Notification(notification.title || "SecurityApi", {
+            body: notification.body || "Notificacion recibida",
+          });
+        }
+      });
+
+      firebaseMessagingClient = {
+        messaging,
+        getTokenFn: firebaseMessagingModule.getToken,
+      };
+
+      return firebaseMessagingClient;
     }
 
     function updateRoleSelect(roles) {
