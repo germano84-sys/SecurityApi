@@ -6,3 +6,5 @@ cryptography
 bcrypt
 python-jose[cryptography]
 python-dotenv
+jinja2
+firebase-admin

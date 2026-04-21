@@ -1,9 +1,28 @@
 from fastapi import APIRouter, Depends
 
-from clases.schemas import MasterTokenRequest, LoginRequest, RegisterRequest, RoleUpdateRequest, TokenResponse, UserResponse
-from core.security import get_current_user, require_admin, require_admin_master_key, require_super_admin
-from repositories.user_repository import list_users
-from services.auth_service import generate_token_for_user, login_user, register_user, set_user_inactive, set_user_role
+from secureapi.clases.schemas import (
+    LoginRequest,
+    MasterTokenRequest,
+    RegisterRequest,
+    RoleListResponse,
+    RoleResponse,
+    RoleCreateRequest,
+    RoleUpdateRequest,
+    TokenResponse,
+    UserInactiveResponse,
+    UserListResponse,
+    UserResponse,
+)
+from secureapi.core.security import get_current_user, require_admin, require_admin_master_key, require_supervisor_or_admin
+from secureapi.repositories.user_repository import list_roles, list_users
+from secureapi.services.auth_service import (
+    create_role_entry,
+    generate_token_for_user,
+    login_user,
+    register_user,
+    set_user_inactive,
+    set_user_role,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -11,9 +30,9 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.post("/register", summary="Registrar usuario", response_model=UserResponse)
 def register(
     payload: RegisterRequest,
-    _=Depends(require_admin),
+    current_user=Depends(require_supervisor_or_admin),
 ):
-    return register_user(payload.username, payload.password)
+    return register_user(payload.username, payload.password, payload.role, current_user)
 
 
 @router.post("/login", summary="Iniciar sesion", response_model=TokenResponse)
@@ -39,16 +58,26 @@ def me(current_user=Depends(get_current_user)):
 def update_role(
     username: str,
     payload: RoleUpdateRequest,
-    _=Depends(require_super_admin),
+    _=Depends(require_admin),
 ):
     return set_user_role(username, payload.role)
 
 
-@router.get("/users", summary="Listar usuarios activos")
-def users(_=Depends(require_admin)):
+@router.post("/roles", summary="Crear rol en catalogo", response_model=RoleResponse)
+def create_role(payload: RoleCreateRequest, _=Depends(require_admin)):
+    return create_role_entry(payload.name, payload.description)
+
+
+@router.get("/roles", summary="Listar roles del catalogo", response_model=RoleListResponse)
+def roles(_=Depends(require_supervisor_or_admin)):
+    return {"roles": list_roles()}
+
+
+@router.get("/users", summary="Listar usuarios activos", response_model=UserListResponse)
+def users(_=Depends(require_supervisor_or_admin)):
     return {"users": list_users()}
 
 
-@router.patch("/users/{username}/inactive", summary="Inactivar usuario (auditoria)")
-def inactivate_user(username: str, _=Depends(require_super_admin)):
+@router.patch("/users/{username}/inactive", summary="Inactivar usuario (auditoria)", response_model=UserInactiveResponse)
+def inactivate_user(username: str, _=Depends(require_admin)):
     return set_user_inactive(username)

@@ -2,13 +2,13 @@ from datetime import datetime, timedelta, timezone
 
 import bcrypt
 from fastapi import Depends, Header, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 
-from core.config import ACCESS_TOKEN_EXPIRE_MINUTES, ADMIN_MASTER_KEY, ALGORITHM, SECRET_KEY
-from repositories.user_repository import get_user_by_username
+from secureapi.core.config import ACCESS_TOKEN_EXPIRE_MINUTES, ADMIN_MASTER_KEY, ALGORITHM, SECRET_KEY
+from secureapi.repositories.user_repository import get_user_by_username
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+bearer_scheme = HTTPBearer(auto_error=False)
 
 
 def create_access_token(data: dict):
@@ -22,12 +22,17 @@ def verify_password(plain_password, stored_password_hash):
     return bcrypt.checkpw(plain_password.encode(), stored_password_hash.encode())
 
 
-def get_current_user(token: str = Depends(oauth2_scheme)):
+def get_current_user(credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Token invalido o expirado",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+    if not credentials or credentials.scheme.lower() != "bearer":
+        raise credentials_exception
+
+    token = credentials.credentials
 
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -44,20 +49,20 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
 
 
 def require_admin(current_user=Depends(get_current_user)):
-    if current_user.get("role") not in {"super_admin", "admin", "supervisor"}:
-        raise HTTPException(status_code=403, detail="Se requiere rol supervisor o admin")
-    return current_user
-
-
-def require_super_admin(current_user=Depends(get_current_user)):
-    if current_user.get("role") not in {"super_admin", "admin"}:
+    if current_user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Se requiere rol admin")
     return current_user
 
 
-def require_usuario(current_user=Depends(get_current_user)):
-    if current_user.get("role") != "usuario":
-        raise HTTPException(status_code=403, detail="Se requiere rol usuario")
+def require_supervisor_or_admin(current_user=Depends(get_current_user)):
+    if current_user.get("role") not in {"admin", "supervisor"}:
+        raise HTTPException(status_code=403, detail="Se requiere rol supervisor o admin")
+    return current_user
+
+
+def require_usuario_comun(current_user=Depends(get_current_user)):
+    if current_user.get("role") != "usuario_comun":
+        raise HTTPException(status_code=403, detail="Se requiere rol usuario_comun")
     return current_user
 
 
