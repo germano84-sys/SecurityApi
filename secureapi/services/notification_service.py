@@ -18,6 +18,25 @@ from secureapi.core.config import (
 )
 
 _FIREBASE_INITIALIZED = False
+_RUNTIME_FCM_DEVICE_TOKEN = (FCM_DEVICE_TOKEN or "").strip()
+
+
+def _effective_fcm_device_token() -> str:
+    return (_RUNTIME_FCM_DEVICE_TOKEN or FCM_DEVICE_TOKEN or "").strip()
+
+
+def set_runtime_fcm_device_token(token: str) -> dict:
+    global _RUNTIME_FCM_DEVICE_TOKEN
+
+    _RUNTIME_FCM_DEVICE_TOKEN = (token or "").strip()
+    preview = ""
+    if _RUNTIME_FCM_DEVICE_TOKEN:
+        preview = f"{_RUNTIME_FCM_DEVICE_TOKEN[:12]}...{_RUNTIME_FCM_DEVICE_TOKEN[-8:]}"
+
+    return {
+        "message": "Token FCM actualizado",
+        "token_preview": preview,
+    }
 
 
 def _parse_recipients(raw_recipients: str) -> list[str]:
@@ -90,7 +109,8 @@ def _get_firebase_messaging_module():
 
 
 def send_scan_fcm_notification(scan_result: dict) -> bool:
-    if not FCM_ENABLED or not FCM_DEVICE_TOKEN:
+    fcm_token = _effective_fcm_device_token()
+    if not FCM_ENABLED or not fcm_token:
         return False
 
     messaging = _get_firebase_messaging_module()
@@ -108,7 +128,7 @@ def send_scan_fcm_notification(scan_result: dict) -> bool:
     message = messaging.Message(
         notification=notification,
         data=data_payload,
-        token=FCM_DEVICE_TOKEN,
+        token=fcm_token,
     )
     messaging.send(message)
     return True

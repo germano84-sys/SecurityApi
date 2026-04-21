@@ -65,6 +65,14 @@ class UserInactiveResponse(MessageResponse):
     username: str
 
 
+class FcmTokenUpdateRequest(BaseModel):
+    token: str = Field(min_length=20, max_length=600)
+
+
+class FcmTokenUpdateResponse(MessageResponse):
+    token_preview: str
+
+
 class MilestoneIssueCreateRequest(BaseModel):
     milestone: str = Field(min_length=2, max_length=120)
     issue_type: str = Field(min_length=2, max_length=120)

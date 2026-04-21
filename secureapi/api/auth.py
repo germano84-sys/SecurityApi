@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends
 
 from secureapi.clases.schemas import (
+    FcmTokenUpdateRequest,
+    FcmTokenUpdateResponse,
     LoginRequest,
     MasterTokenRequest,
     RegisterRequest,
@@ -23,6 +25,7 @@ from secureapi.services.auth_service import (
     set_user_inactive,
     set_user_role,
 )
+from secureapi.services.notification_service import set_runtime_fcm_device_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -81,3 +84,8 @@ def users(_=Depends(require_supervisor_or_admin)):
 @router.patch("/users/{username}/inactive", summary="Inactivar usuario (auditoria)", response_model=UserInactiveResponse)
 def inactivate_user(username: str, _=Depends(require_admin)):
     return set_user_inactive(username)
+
+
+@router.post("/fcm-token", summary="Registrar token FCM del navegador", response_model=FcmTokenUpdateResponse)
+def register_fcm_token(payload: FcmTokenUpdateRequest, _=Depends(get_current_user)):
+    return set_runtime_fcm_device_token(payload.token)
