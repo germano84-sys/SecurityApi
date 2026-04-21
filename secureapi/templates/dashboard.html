@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title }}</title>
+  <link rel="stylesheet" href="/static/styles/main.css">
+</head>
+<body>
+  <main class="layout">
+    <header class="hero">
+      <h1>{{ title }}</h1>
+      <p>Gestion de roles, usuarios, tareas y escaneos desde una sola interfaz.</p>
+    </header>
+
+    <section class="panel" id="loginPanel">
+      <h2>1) Login</h2>
+      <div class="row">
+        <input id="username" placeholder="usuario">
+        <input id="password" type="password" placeholder="contrasena">
+        <button onclick="login()">Ingresar</button>
+      </div>
+      <p class="hint">Token actual: <span id="tokenState">sin token</span></p>
+    </section>
+
+    <section class="panel hidden" id="sessionPanel">
+      <h2>Sesion activa</h2>
+      <div class="row">
+        <p class="hint" id="sessionInfo">Sin sesion</p>
+        <button onclick="logout()">Cerrar sesion</button>
+      </div>
+      <p class="notice hidden" id="roleNotice"></p>
+    </section>
+
+    <section class="panel hidden" id="usersRolesPanel">
+      <h2>2) Usuarios y Roles</h2>
+      <div class="grid two">
+        <div>
+          <h3>Registrar Usuario</h3>
+          <div class="stack">
+            <input id="newUser" placeholder="username">
+            <input id="newPass" type="password" placeholder="password" minlength="8" required>
+            <p class="hint" id="registerPasswordHint">La contraseña debe tener al menos 8 caracteres.</p>
+            <select id="newRole">
+              {% for role in role_options %}
+              <option value="{{ role }}">{{ role }}</option>
+              {% endfor %}
+            </select>
+            <button id="registerUserBtn" onclick="registerUser()">Registrar</button>
+          </div>
+        </div>
+        <div>
+          <h3>Crear Rol</h3>
+          <div class="stack">
+            <input id="roleName" placeholder="nombre_rol">
+            <input id="roleDesc" placeholder="descripcion">
+            <button id="createRoleBtn" onclick="createRole()">Crear Rol</button>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <button id="listUsersBtn" onclick="listUsers()">Listar Usuarios</button>
+        <button id="listRolesBtn" onclick="listRoles()">Listar Roles</button>
+      </div>
+    </section>
+
+    <section class="panel hidden" id="tasksPanel">
+      <h2>3) Tareas</h2>
+      <div class="grid two">
+        <div id="taskCreateBlock">
+          <h3>Asignar Tarea</h3>
+          <div class="stack">
+            <input id="taskTitle" placeholder="titulo">
+            <input id="taskDesc" placeholder="descripcion">
+            <input id="taskMilestone" placeholder="milestone">
+            <input id="taskIssue" placeholder="issue_type">
+            <input id="taskAssignee" placeholder="usuario_comun destino" list="taskAssigneeOptions">
+            <datalist id="taskAssigneeOptions"></datalist>
+            <input id="taskDue" placeholder="YYYY-MM-DD HH:MM:SS">
+            <button id="createTaskBtn" onclick="createTask()">Crear Tarea</button>
+          </div>
+        </div>
+        <div id="taskUpdateBlock">
+          <h3>Actualizar Estado (usuario_comun)</h3>
+          <div class="stack">
+            <input id="taskId" placeholder="task_id">
+            <select id="taskStatus">
+              {% for task_state in task_states %}
+              <option value="{{ task_state }}">{{ task_state }}</option>
+              {% endfor %}
+            </select>
+            <input id="taskNote" placeholder="nota">
+            <button id="updateTaskStatusBtn" onclick="updateTaskStatus()">Guardar Estado</button>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <button id="listAllTasksBtn" onclick="listAllTasks()">Tablero General</button>
+        <button id="listMyTasksBtn" onclick="listMyTasks()">Mis Tareas</button>
+      </div>
+    </section>
+
+    <section class="panel hidden" id="scanPanel">
+      <h2>4) Escaner y Historial</h2>
+      <div class="row">
+        <input id="scanUrl" placeholder="https://example.com">
+        <button id="scanSiteBtn" onclick="scanSite()">Escanear</button>
+        <button id="scanHistoryBtn" onclick="scanHistory()">Ver Historial</button>
+      </div>
+    </section>
+
+    <section class="panel output">
+      <h2>Respuesta</h2>
+      <pre id="output">Esperando acciones...</pre>
+    </section>
+  </main>
+
+  <script>
+    let token = "";
+    let currentUser = null;
+
+    function setVisible(elementId, visible) {
+      const element = document.getElementById(elementId);
+      if (!element) {
+        return;
+      }
+      element.classList.toggle("hidden", !visible);
+    }
+
+    function setEnabled(elementId, enabled) {
+      const element = document.getElementById(elementId);
+      if (!element) {
+        return;
+      }
+      element.disabled = !enabled;
+      element.title = enabled ? "" : "No tienes permisos para esta accion";
+    }
+
+    function can(action) {
+      const role = currentUser?.role;
+      const permissionByAction = {
+        manageUsersAndRoles: role === "admin",
+        createAndViewAllTasks: role === "supervisor",
+        manageOwnTasks: role === "usuario_comun",
+        scanAndViewHistory: role === "usuario_comun",
+      };
+      return Boolean(permissionByAction[action]);
+    }
+
+    function updateRoleNotice() {
+      const roleNotice = document.getElementById("roleNotice");
+      if (!currentUser) {
+        roleNotice.classList.add("hidden");
+        roleNotice.textContent = "";
+        return;
+      }
+
+      const messages = {
+        admin: "Rol admin: puedes registrar usuarios, crear roles y listar usuarios/roles.",
+        supervisor: "Rol supervisor: puedes crear tickets y ver tablero general de tareas.",
+        usuario_comun: "Rol usuario_comun: puedes escanear, ver tus tareas y actualizar solo tus estados.",
+      };
+
+      roleNotice.textContent = messages[currentUser.role] || "Rol sin permisos configurados en UI.";
+      roleNotice.classList.remove("hidden");
+    }
+
+    function applyPermissionLocks() {
+      setEnabled("registerUserBtn", can("manageUsersAndRoles"));
+      setEnabled("createRoleBtn", can("manageUsersAndRoles"));
+      setEnabled("listUsersBtn", can("manageUsersAndRoles"));
+      setEnabled("listRolesBtn", can("manageUsersAndRoles"));
+
+      setEnabled("createTaskBtn", can("createAndViewAllTasks"));
+      setEnabled("listAllTasksBtn", can("createAndViewAllTasks"));
+
+      setEnabled("updateTaskStatusBtn", can("manageOwnTasks"));
+      setEnabled("listMyTasksBtn", can("manageOwnTasks"));
+
+      setEnabled("scanSiteBtn", can("scanAndViewHistory"));
+      setEnabled("scanHistoryBtn", can("scanAndViewHistory"));
+    }
+
+    function denyIfUnauthorized(action, actionLabel) {
+      if (can(action)) {
+        return false;
+      }
+      show({
+        detail: `Accion no permitida: ${actionLabel}`,
+        role: currentUser?.role || "sin_sesion",
+      });
+      return true;
+    }
+
+    function refreshUiByRole() {
+      const role = currentUser?.role || null;
+      const isLogged = Boolean(token && currentUser);
+
+      setVisible("loginPanel", !isLogged);
+      setVisible("sessionPanel", isLogged);
+
+      if (!isLogged) {
+        setVisible("usersRolesPanel", false);
+        setVisible("tasksPanel", false);
+        setVisible("scanPanel", false);
+        updateRoleNotice();
+        applyPermissionLocks();
+        return;
+      }
+
+      document.getElementById("sessionInfo").textContent = `Usuario: ${currentUser.username} | Rol: ${role}`;
+
+      const isAdmin = role === "admin";
+      const isSupervisor = role === "supervisor";
+      const isUsuarioComun = role === "usuario_comun";
+
+      setVisible("usersRolesPanel", isAdmin);
+      setVisible("tasksPanel", isSupervisor || isUsuarioComun);
+      setVisible("scanPanel", isUsuarioComun);
+
+      setVisible("taskCreateBlock", isSupervisor);
+      setVisible("listAllTasksBtn", isSupervisor);
+
+      setVisible("taskUpdateBlock", isUsuarioComun);
+      setVisible("listMyTasksBtn", isUsuarioComun);
+
+      updateRoleNotice();
+      applyPermissionLocks();
+    }
+
+    function setSession(accessToken, user) {
+      token = accessToken || "";
+      currentUser = user || null;
+      if (!token || !currentUser) {
+        resetDashboardState();
+      }
+      document.getElementById("tokenState").textContent = token ? "activo" : "sin token";
+      refreshUiByRole();
+    }
+
+    function headers() {
+      const base = {"Content-Type": "application/json"};
+      if (token) {
+        base["Authorization"] = `Bearer ${token}`;
+      }
+      return base;
+    }
+
+    function show(data) {
+      document.getElementById("output").textContent = JSON.stringify(data, null, 2);
+    }
+
+    function clearRegisterForm() {
+      document.getElementById("newUser").value = "";
+      document.getElementById("newPass").value = "";
+      document.getElementById("newRole").selectedIndex = 0;
+    }
+
+    function clearCreateRoleForm() {
+      document.getElementById("roleName").value = "";
+      document.getElementById("roleDesc").value = "";
+    }
+
+    function clearTaskForm() {
+      document.getElementById("taskTitle").value = "";
+      document.getElementById("taskDesc").value = "";
+      document.getElementById("taskMilestone").value = "";
+      document.getElementById("taskIssue").value = "";
+      document.getElementById("taskAssignee").value = "";
+      document.getElementById("taskDue").value = "";
+      document.getElementById("taskId").value = "";
+      document.getElementById("taskStatus").selectedIndex = 0;
+      document.getElementById("taskNote").value = "";
+    }
+
+    function clearScanForm() {
+      document.getElementById("scanUrl").value = "";
+    }
+
+    function clearLoginForm() {
+      document.getElementById("username").value = "";
+      document.getElementById("password").value = "";
+    }
+
+    function resetDashboardState() {
+      clearLoginForm();
+      clearRegisterForm();
+      clearCreateRoleForm();
+      clearTaskForm();
+      clearScanForm();
+
+      document.getElementById("sessionInfo").textContent = "Sin sesion";
+      document.getElementById("roleNotice").textContent = "";
+      document.getElementById("roleNotice").classList.add("hidden");
+      document.getElementById("output").textContent = "Esperando acciones...";
+      document.getElementById("taskAssigneeOptions").innerHTML = "";
+    }
+
+    function updateRoleSelect(roles) {
+      const select = document.getElementById("newRole");
+      if (!select || !Array.isArray(roles)) {
+        return;
+      }
+
+      const currentValue = select.value;
+      select.innerHTML = "";
+
+      roles
+        .map((entry) => (typeof entry === "string" ? entry : entry?.name))
+        .filter(Boolean)
+        .forEach((roleName) => {
+          const option = document.createElement("option");
+          option.value = roleName;
+          option.textContent = roleName;
+          select.appendChild(option);
+        });
+
+      if (currentValue && [...select.options].some((option) => option.value === currentValue)) {
+        select.value = currentValue;
+      }
+    }
+
+    function updateAssigneeOptions(users) {
+      const datalist = document.getElementById("taskAssigneeOptions");
+      if (!datalist || !Array.isArray(users)) {
+        return;
+      }
+
+      datalist.innerHTML = "";
+      users
+        .map((entry) => entry?.username)
+        .filter(Boolean)
+        .forEach((username) => {
+          const option = document.createElement("option");
+          option.value = username;
+          datalist.appendChild(option);
+        });
+    }
+
+    async function refreshRoleOptions() {
+      const role = currentUser?.role;
+      if (!role || (role !== "admin" && role !== "supervisor")) {
+        return;
+      }
+
+      try {
+        const payload = await api("GET", "/auth/roles");
+        updateRoleSelect(payload.roles || []);
+      } catch (_error) {
+        // Ignore when role is not allowed to read catalog.
+      }
+    }
+
+    async function refreshUserOptions() {
+      const role = currentUser?.role;
+      if (!role || (role !== "admin" && role !== "supervisor")) {
+        return;
+      }
+
+      try {
+        const payload = await api("GET", "/auth/users");
+        updateAssigneeOptions(payload.users || []);
+      } catch (_error) {
+        // Ignore when role is not allowed to list users.
+      }
+    }
+
+    async function refreshDynamicCatalogs() {
+      await Promise.all([refreshRoleOptions(), refreshUserOptions()]);
+    }
+
+    async function api(method, url, body = null) {
+      const options = { method, headers: headers() };
+      if (body) {
+        options.body = JSON.stringify(body);
+      }
+      const response = await fetch(url, options);
+      const data = await response.json();
+      if (!response.ok) {
+        throw data;
+      }
+      return data;
+    }
+
+    async function loadCurrentUser() {
+      return api("GET", "/auth/me");
+    }
+
+    async function login() {
+      try {
+        const data = await api("POST", "/auth/login", {
+          username: document.getElementById("username").value,
+          password: document.getElementById("password").value
+        });
+        token = data.access_token || "";
+        const me = await loadCurrentUser();
+        setSession(token, me);
+        await refreshDynamicCatalogs();
+        show(data);
+      } catch (error) {
+        setSession("", null);
+        show(error);
+      }
+    }
+
+    function logout() {
+      setSession("", null);
+      show({message: "Sesion cerrada"});
+    }
+
+    async function registerUser() {
+      if (denyIfUnauthorized("manageUsersAndRoles", "Registrar usuario")) {
+        return;
+      }
+      try {
+        const password = document.getElementById("newPass").value;
+        if ((password || "").length < 8) {
+          show({
+            error: "La contraseña debe tener al menos 8 caracteres.",
+            detail: "Usa una contraseña más larga antes de registrar el usuario.",
+          });
+          return;
+        }
+
+        const data = await api("POST", "/auth/register", {
+          username: document.getElementById("newUser").value,
+          password,
+          role: document.getElementById("newRole").value
+        });
+        clearRegisterForm();
+        await refreshUserOptions();
+        show(data);
+      } catch (error) {
+        show(error);
+      }
+    }
+
+    async function createRole() {
+      if (denyIfUnauthorized("manageUsersAndRoles", "Crear rol")) {
+        return;
+      }
+      try {
+        const data = await api("POST", "/auth/roles", {
+          name: document.getElementById("roleName").value,
+          description: document.getElementById("roleDesc").value
+        });
+        clearCreateRoleForm();
+        await refreshRoleOptions();
+        show(data);
+      } catch (error) {
+        show(error);
+      }
+    }
+
+    async function listUsers() {
+      if (denyIfUnauthorized("manageUsersAndRoles", "Listar usuarios")) {
+        return;
+      }
+      try {
+        show(await api("GET", "/auth/users"));
+      } catch (error) {
+        show(error);
+      }
+    }
+
+    async function listRoles() {
+      if (denyIfUnauthorized("manageUsersAndRoles", "Listar roles")) {
+        return;
+      }
+      try {
+        show(await api("GET", "/auth/roles"));
+      } catch (error) {
+        show(error);
+      }
+    }
+
+    async function createTask() {
+      if (denyIfUnauthorized("createAndViewAllTasks", "Crear tarea")) {
+        return;
+      }
+      try {
+        const data = await api("POST", "/tasks", {
+          title: document.getElementById("taskTitle").value,
+          description: document.getElementById("taskDesc").value,
+          milestone: document.getElementById("taskMilestone").value,
+          issue_type: document.getElementById("taskIssue").value,
+          assigned_to_username: document.getElementById("taskAssignee").value,
+          due_at: document.getElementById("taskDue").value
+        });
+        show(data);
+      } catch (error) {
+        show(error);
+      }
+    }
+
+    async function updateTaskStatus() {
+      if (denyIfUnauthorized("manageOwnTasks", "Actualizar estado de tarea")) {
+        return;
+      }
+      try {
+        const id = document.getElementById("taskId").value;
+        const data = await api("PATCH", `/tasks/${id}/status`, {
+          status: document.getElementById("taskStatus").value,
+          notes: document.getElementById("taskNote").value
+        });
+        show(data);
+      } catch (error) {
+        show(error);
+      }
+    }
+
+    async function listAllTasks() {
+      if (denyIfUnauthorized("createAndViewAllTasks", "Ver tablero general")) {
+        return;
+      }
+      try {
+        show(await api("GET", "/tasks"));
+      } catch (error) {
+        show(error);
+      }
+    }
+
+    async function listMyTasks() {
+      if (denyIfUnauthorized("manageOwnTasks", "Ver mis tareas")) {
+        return;
+      }
+      try {
+        show(await api("GET", "/tasks/my"));
+      } catch (error) {
+        show(error);
+      }
+    }
+
+    async function scanSite() {
+      if (denyIfUnauthorized("scanAndViewHistory", "Escanear sitio")) {
+        return;
+      }
+      try {
+        const url = encodeURIComponent(document.getElementById("scanUrl").value);
+        show(await api("GET", `/escanear?url=${url}`));
+      } catch (error) {
+        show(error);
+      }
+    }
+
+    async function scanHistory() {
+      if (denyIfUnauthorized("scanAndViewHistory", "Ver historial de escaneos")) {
+        return;
+      }
+      try {
+        show(await api("GET", "/historial"));
+      } catch (error) {
+        show(error);
+      }
+    }
+
+    refreshUiByRole();
+  </script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+.venv/
+
+# Sensitive env files
+.env
+secureapi/.env
+
+# Local databases
+secureapi/scans.db
