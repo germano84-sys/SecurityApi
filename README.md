@@ -186,72 +186,72 @@ Implementa una Cola de Mensajería (Message Queue) como RabbitMQ o Redis. Si el 
 ##
 ##
 ## API LOGIN
-![API LOGIN](./secureApi/img/api_ingreso.jpg)
+![API LOGIN](./secureapi/img/api_ingreso.jpg)
 ##
 ##
 ## API EN EJECUCION 
-![API EN EJECUCION](./secureApi/img/api_enejecute.jpg)
+![API EN EJECUCION](./secureapi/img/api_enejecute.jpg)
 ##
 ##
 ## LISTA USUARIOS 
-![API EN EJECUCION](./secureApi/img/api_listarusu.jpg)
+![API EN EJECUCION](./secureapi/img/api_listarusu.jpg)
 ##
 ##
 ## LISTA ROLES
-![API EN EJECUCION](./secureApi/img/api_listaroles.jpg)
+![API EN EJECUCION](./secureapi/img/api_listaroles.jpg)
 ##
 ##
 ## API EN EJECUCION 
-![API EN EJECUCION](./secureApi/img/api_enejecute.jpg)
+![API EN EJECUCION](./secureapi/img/api_enejecute.jpg)
 ##
 ##
 ## API ESCANER
-![API ESCANER](./secureApi/img/api_endpoint_auth.jpg)
+![API ESCANER](./secureapi/img/api_endpoint_auth.jpg)
 ##
 ##
 ## API INGRESO LINK
-![API LINK SCANEAR](./secureApi/img/api_endpoint_work.jpg)
+![API LINK SCANEAR](./secureapi/img/api_endpoint_work.jpg)
 ##
 ##
 ## API SCANEANDO
-![API LINK SCANEAR](./secureApi/img/api_endpoint_work1.jpg)
+![API LINK SCANEAR](./secureapi/img/api_endpoint_work1.jpg)
 ##
 ##
 ## API WORK
-![API LINK SCANEAR](./secureApi/img/api_endpoint_workresult_get.jpg)
+![API LINK SCANEAR](./secureapi/img/api_endpoint_workresult_get.jpg)
 ##
 ##
 ## API WORK
-![API LINK SCANEAR](./secureApi/img/api_endpoint_workresult_patch.jpg)
+![API LINK SCANEAR](./secureapi/img/api_endpoint_workresult_patch.jpg)
 ##
 ##
 ## API WORK RESULT
-![API LINK SCANEAR](./secureApi/img/api_endpoint_workresult1.jpg)
+![API LINK SCANEAR](./secureapi/img/api_endpoint_workresult1.jpg)
 ##
 ##
 ## API WORK RESULT
-![API LINK SCANEAR](./secureApi/img/api_endpoint_workresult2.jpg)
+![API LINK SCANEAR](./secureapi/img/api_endpoint_workresult2.jpg)
 ##
 ##
 ## API WORK RESULT
-![API LINK SCANEAR](./secureApi/img/api_endpoint_workresult3.jpg)
+![API LINK SCANEAR](./secureapi/img/api_endpoint_workresult3.jpg)
 ##
 ##
 ## API WORK SECURITY
-![API LINK SCANEAR](./secureApi/img/api_work_get_Security1.jpg)
+![API LINK SCANEAR](./secureapi/img/api_work_get_Security1.jpg)
 ##
 ##
 ## API WORK SECURITY
-![API LINK SCANEAR](./secureApi/img/api_work_get_Security2.jpg)
+![API LINK SCANEAR](./secureapi/img/api_work_get_Security2.jpg)
 ##
 ##
 ## API WORK TASK
-![API LINK SCANEAR](./secureApi/img/api_work_get_task1.jpg)
+![API LINK SCANEAR](./secureapi/img/api_work_get_task1.jpg)
 ##
 ##
 ## API WORK TASK
-![API LINK SCANEAR](./secureApi/img/api_work_get_task2.jpg)
+![API LINK SCANEAR](./secureapi/img/api_work_get_task2.jpg)
 ##
 ##
 ## API WORK TASK
-![API LINK SCANEAR](./secureApi/img/api_work_patch_task.jpg)
+![API LINK SCANEAR](./secureapi/img/api_work_patch_task.jpg)
