@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FCM Token Generator</title>
+  <style>
+    body { font-family: Segoe UI, Arial, sans-serif; margin: 2rem; max-width: 900px; }
+    h1 { margin-bottom: 0.5rem; }
+    .hint { color: #555; margin-bottom: 1rem; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    label { font-size: 0.9rem; color: #333; display: block; margin-bottom: 0.2rem; }
+    input, textarea, button { width: 100%; box-sizing: border-box; padding: 0.65rem; }
+    textarea { min-height: 120px; font-family: Consolas, monospace; }
+    .actions { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.75rem; margin-top: 1rem; }
+    .full { margin-top: 1rem; }
+    .ok { color: #0a7a2f; }
+    .err { color: #b00020; }
+    @media (max-width: 720px) {
+      .grid, .actions { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Generar FCM Device Token</h1>
+  <p class="hint">Completa los datos de tu app web de Firebase y pulsa Generar token. Tu VAPID ya esta precargada.</p>
+
+  <div class="grid">
+    <div>
+      <label for="apiKey">apiKey</label>
+      <input id="apiKey" value="AIzaSyDUx8iLmsDzNd8CHyPvViaTWCs5-RELx0w" placeholder="AIza...">
+    </div>
+    <div>
+      <label for="authDomain">authDomain</label>
+      <input id="authDomain" value="securityapi-b6b9d.firebaseapp.com" placeholder="tu-proyecto.firebaseapp.com">
+    </div>
+    <div>
+      <label for="projectId">projectId</label>
+      <input id="projectId" value="securityapi-b6b9d" placeholder="tu-proyecto-id">
+    </div>
+    <div>
+      <label for="storageBucket">storageBucket</label>
+      <input id="storageBucket" value="securityapi-b6b9d.firebasestorage.app" placeholder="tu-proyecto.appspot.com">
+    </div>
+    <div>
+      <label for="messagingSenderId">messagingSenderId</label>
+      <input id="messagingSenderId" value="57499153855" placeholder="1234567890">
+    </div>
+    <div>
+      <label for="appId">appId</label>
+      <input id="appId" value="1:57499153855:web:50a52344649dbd37f05d0a" placeholder="1:1234567890:web:...">
+    </div>
+  </div>
+
+  <div class="full">
+    <label for="vapidKey">VAPID key (Web Push certificate)</label>
+    <input id="vapidKey" value="BMuIY4RFBhzCbyJyaV0jit7M70KJgV0CuWSglrR7F4ipaa0dMeSHW-sn88ZPAYRe-VV_wpSvxyBtjLF1YwPQALs">
+  </div>
+
+  <div class="actions">
+    <button id="saveConfigBtn">Guardar config</button>
+    <button id="genTokenBtn">Generar token</button>
+    <button id="copyBtn">Copiar token</button>
+  </div>
+
+  <div class="full">
+    <label for="tokenOut">FCM_DEVICE_TOKEN</label>
+    <textarea id="tokenOut" placeholder="Aqui aparecera el token..."></textarea>
+  </div>
+
+  <p id="status" class="hint">Estado: pendiente</p>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+    import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging.js";
+
+    const fields = [
+      "apiKey",
+      "authDomain",
+      "projectId",
+      "storageBucket",
+      "messagingSenderId",
+      "appId",
+      "vapidKey"
+    ];
+
+    function byId(id) {
+      return document.getElementById(id);
+    }
+
+    function setStatus(message, ok = true) {
+      const status = byId("status");
+      status.textContent = `Estado: ${message}`;
+      status.className = ok ? "ok" : "err";
+    }
+
+    function loadConfig() {
+      for (const key of fields) {
+        const saved = localStorage.getItem(`fcm_${key}`);
+        if (saved) byId(key).value = saved;
+      }
+    }
+
+    function saveConfig() {
+      for (const key of fields) {
+        localStorage.setItem(`fcm_${key}`, byId(key).value.trim());
+      }
+      setStatus("configuracion guardada", true);
+    }
+
+    function readConfig() {
+      const config = {};
+      for (const key of ["apiKey", "authDomain", "projectId", "storageBucket", "messagingSenderId", "appId"]) {
+        config[key] = byId(key).value.trim();
+      }
+      const vapidKey = byId("vapidKey").value.trim();
+      return { config, vapidKey };
+    }
+
+    function validate(config, vapidKey) {
+      const missing = Object.entries(config).filter(([, v]) => !v).map(([k]) => k);
+      if (missing.length) {
+        throw new Error(`Faltan campos: ${missing.join(", ")}`);
+      }
+      if (!vapidKey) {
+        throw new Error("Falta VAPID key");
+      }
+    }
+
+    async function generateToken() {
+      try {
+        const { config, vapidKey } = readConfig();
+        validate(config, vapidKey);
+
+        const permission = await Notification.requestPermission();
+        if (permission !== "granted") {
+          throw new Error("Permiso de notificaciones denegado");
+        }
+
+        const app = initializeApp(config);
+        const messaging = getMessaging(app);
+        const swReg = await navigator.serviceWorker.register("./firebase-messaging-sw.js");
+
+        const token = await getToken(messaging, {
+          vapidKey,
+          serviceWorkerRegistration: swReg,
+        });
+
+        if (!token) {
+          throw new Error("No se pudo obtener token");
+        }
+
+        byId("tokenOut").value = token;
+        setStatus("token generado correctamente", true);
+      } catch (error) {
+        setStatus(error.message || String(error), false);
+      }
+    }
+
+    async function copyToken() {
+      const token = byId("tokenOut").value.trim();
+      if (!token) {
+        setStatus("no hay token para copiar", false);
+        return;
+      }
+      await navigator.clipboard.writeText(token);
+      setStatus("token copiado", true);
+    }
+
+    byId("saveConfigBtn").addEventListener("click", saveConfig);
+    byId("genTokenBtn").addEventListener("click", generateToken);
+    byId("copyBtn").addEventListener("click", copyToken);
+
+    loadConfig();
+  </script>
+</body>
+</html>
